@@ -1,0 +1,9 @@
+{
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "typeinfo": "cpp",
+        "iostream": "cpp",
+        "iosfwd": "cpp",
+        "istream": "cpp"
+    }
+}
