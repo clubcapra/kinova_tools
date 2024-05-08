@@ -15,11 +15,6 @@ if (UNIX)
     add_definitions(-DARCH=${ARCH}) 
 endif (UNIX)
 
-# Build only x86 on Windows
-if (WIN32)
-    set(ARCH "x86")
-endif (WIN32)
-
 # Set build-specific configurations.
 if(MODE STREQUAL "debug")
     set(CMAKE_BUILD_TYPE Debug)

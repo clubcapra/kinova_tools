@@ -15,8 +15,8 @@
 #include <stdio.h>
 
 //This defines the the location of the communication layer.(Kinova.API.CommLayerUbuntu.so)
-#define COMM_LAYER_PATH "Kinova.API.CommLayerUbuntu.so"
-#define COMM_LAYER_ETHERNET_PATH "Kinova.API.EthCommLayerUbuntu.so"
+#define COMM_LAYER_PATH "../includes/api/Kinova.API.CommLayerUbuntu.so"
+#define COMM_LAYER_ETHERNET_PATH "../includes/api/Kinova.API.EthCommLayerUbuntu.so"
 
 // ***** E R R O R   C O D E S ******
 #define ERROR_INIT_API 2001      // Error while initializing the API
