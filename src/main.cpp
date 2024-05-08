@@ -324,6 +324,8 @@ int setID()
     int res = MySetActuatorAddress(src, dst);
     printAPIError(res);
 
+    std::cout << "In order for the actuator to take the address, the controller must be restarted." << std::endl;
+
     return 0;
 }
 
