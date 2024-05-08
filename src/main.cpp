@@ -20,6 +20,7 @@ KinovaFuncDef(int, ClearErrorLog,);
 KinovaFuncDef(int, GetAngularCommand, AngularPosition &position);
 // KinovaFuncDef(int, GetActuatorsPosition, float* positions);
 KinovaFuncDef(int, GetPositionCurrentActuators, float positions[POSITION_CURRENT_COUNT]);
+KinovaFuncDef(int, GetPeripheralInventory, PeripheralInfo[MAX_INVENTORY]);
 
 // Forward declarations
 void printErrors();
@@ -36,16 +37,22 @@ struct command
 };
 #define Command(func) command{TOKENIZE(func), &func}
 
+int refresh();
+int getActuators();
+int setID();
 int printDevs();
 int move();
 int getID();
-int setID();
 
 command commands[] = {
-    Command(printDevs),
-    Command(move),
-    Command(getID),
+    Command(refresh),
+    Command(getActuators),
     Command(setID),
+
+    // -- Advanced functions --
+    // Command(printDevs),
+    // Command(move),
+    // Command(getID),
 };
 const int commandCount = sizeof(commands) / sizeof(command);
 
@@ -79,6 +86,39 @@ int run()
     }
 
     return 0;
+}
+
+// Create ethernet config
+EthernetCommConfig config;
+bool connected = false;
+
+void connect()
+{
+    int result;
+    if (connected)
+    {
+        result = MyCloseAPI();
+        printAPIError(result);
+        connected = false;
+        std::cout << "Disconnected" << std::endl;
+    }
+    // Wait for connection
+    std::cout << "Connecting ";
+    while (true)
+    {
+        result = MyInitEthernetAPI(config);
+        
+        if (result == NO_ERROR_KINOVA) break;
+        
+
+        result = MyCloseAPI();
+        printAPIError(result);
+        connected = false;
+        std::cout << '.';
+        sleep(5);
+    }
+    std::cout << " Connected" << std::endl;
+    connected = true;
 }
 
 int main(int argc, char** argv)
@@ -121,9 +161,10 @@ int main(int argc, char** argv)
     // Error();
     KinovaFunc(int, GetPositionCurrentActuators, float positions[POSITION_CURRENT_COUNT]);
     Error();
+    KinovaFunc(int, GetPeripheralInventory, PeripheralInfo[MAX_INVENTORY]);
+    Error();
 
-    // Create ethernet config
-    EthernetCommConfig config;
+    
 
 	config.localBcastPort = 25015;
 	config.localCmdport   = 25025;
@@ -138,22 +179,9 @@ int main(int argc, char** argv)
     {
         std::cout << "API loaded successfully!" << std::endl;
         int result;
-        // Wait for connection
-        while (true)
-        {
-            // result = (*MyInitAPI)();
-            result = MyInitEthernetAPI(config);
-            
-            if (result == NO_ERROR_KINOVA) break;
-            // result = (*MyInitEthernetAPI)(config);
-            // if (result == NO_ERROR_KINOVA) break;
-            std::cout << "Initialization's result :" << result << std::endl;
+        
+        connect();
 
-            result = MyCloseAPI();
-            std::cout << "Close's result :" << result << std::endl;
-            sleep(5);
-            // (*MyEthCloseAPI)();
-        }
         std::cout << "Connected!" << std::endl;
         printErrors();
 
@@ -176,6 +204,11 @@ int main(int argc, char** argv)
     UnloadAPI();
     // EthCommUnloadAPI();
     return retCode;
+}
+
+int refresh()
+{
+    connect();
 }
 
 int printDevs()
@@ -252,103 +285,44 @@ int getID()
     return 0;
 }
 
-int inSrc(int (&bindings)[MAX_ACTUATORS][2], int id)
+int getActuators()
 {
-    for (int i = 0; i < MAX_ACTUATORS; ++i)
+    PeripheralInfo inventory[MAX_INVENTORY];
+
+    int res = MyGetPeripheralInventory(inventory);
+    printAPIError(res);
+
+    if (res == NO_ERROR_KINOVA)
     {
-        if (id == bindings[i][0]) return i;
-    }
-    return -1;
-}
-
-int inDst(int (&bindings)[MAX_ACTUATORS][2], int id)
-{
-    for (int i = 0; i < MAX_ACTUATORS; ++i)
-    {
-        if (id == bindings[i][1]) return i;
-    }
-    return -1;
-}
-
-void swap(int (&mem)[MAX_ACTUATORS], int src, int dst, int actualDst)
-{
-    if (src == dst) return;
-    mem[src] = -1;
-    MySetActuatorAddress(src, dst);
-    mem[dst] = actualDst;
-}
-
-int reassignRecur(int (&bindings)[MAX_ACTUATORS][2], int (&mem)[MAX_ACTUATORS], int src, int dst, int count)
-{
-    // Make way
-    swap(mem, dst, count, bindings[inSrc(bindings, dst)][1]);
-    swap(mem, src, dst, dst);
-    swap(mem, count, src, mem[count]);
-}
-
-int reassign(int (&bindings)[MAX_ACTUATORS][2], int count)
-{
-    // Find size
-    int mem[MAX_ACTUATORS];
-
-    for (int i = 0; i < MAX_ACTUATORS; ++i)
-    {
-        mem[i] = -1;
-    }
-
-    for (int i = 0; i < count; ++i)
-    {
-        if (bindings[i][0] == bindings[i][1])
+        std::cout << std::endl << "Actuator addresses start at 16. So actuator 1 has address 16, actuator 2 has 17, and so on" << std::endl;
+        for (int i = 0; i < MAX_INVENTORY; ++i)
         {
-            if (mem[bindings[i][0]] != -1) return 1;
-            mem[bindings[i][0]] = bindings[i][0];
+            if (inventory[i].Port != PORT_TYPE::PERIPHERAL_PORT_PORT_UART_0) continue;
+            std::cout << "Address: " << inventory[i].Address <<
+                " Code version: " << inventory[i].CodeVersion <<
+                " Handle: " << inventory[i].Handle <<
+                " Port: " << inventory[i].Port <<
+                " Type: " << inventory[i].Type <<
+                std::endl;
         }
     }
-
-    while (true)
-    {
-        bool allDone = true;
-        for (int i = 0; i < count; ++i)
-        {
-            if (bindings[i][0] == bindings[i][1]) continue;
-            if (mem[bindings[i][1]] != -1) continue;
-            allDone = false;
-            reassignRecur(bindings, mem, bindings[i][0], bindings[i][1], count);
-        }
-        if (allDone) break;
-    }
-    return 1;
+    return res;
 }
 
 int setID()
 {
-    // GeneralInformations result;
-    // MyGetGeneralInformations(result);
-    // int count = result.ConnectedActuatorCount;
-    int address;
-    // int bindings[MAX_ACTUATORS][2] = {-1};
-        
-    // for (int i = 0; i < count; ++i)
-    // {
-    //     std::cout << "Source ID: ";
-    //     std::cin >> address;
-    //     bindings[i][0] = address;
-
-    //     std::cout << "Destination ID: ";
-    //     std::cin >> address;
-    //     bindings[i][1] = address;
-    // }
-
-    // reassign(bindings, count);
+    int src, dst;
     
-    std::cout << "Destination ID: ";
-    std::cin >> address;
+    std::cout << "Source ID: ";
+    std::cin >> src;
 
-    for (int i = 0; i < MAX_ACTUATORS; ++i)
-    {
-        int res = MySetActuatorAddress(i, address);
-        printAPIError(res);
-    }
+    std::cout << "Destination ID: ";
+    std::cin >> dst;
+
+
+
+    int res = MySetActuatorAddress(src, dst);
+    printAPIError(res);
 
     return 0;
 }
